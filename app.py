@@ -1,8 +1,5 @@
-import os
-
 import pandas as pd
 import streamlit as st
-from sqlalchemy import create_engine
 
 
 # ------------------------------------------------------------
@@ -17,74 +14,23 @@ st.set_page_config(
 
 
 # ------------------------------------------------------------
-# Conexión a MariaDB
+# Carga de resultados analíticos
 # ------------------------------------------------------------
-
-@st.cache_resource
-def get_engine():
-    host = os.getenv("DB_HOST", "localhost")
-    port = os.getenv("DB_PORT", "3307")
-    user = os.getenv("DB_USER", "root")
-    password = os.getenv("DB_PASSWORD")
-    database = os.getenv("DB_NAME", "nyc_mobility")
-
-    if not password:
-        st.error("DB_PASSWORD no está configurada.")
-        st.stop()
-
-    return create_engine(
-        f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}"
-    )
-
 
 @st.cache_data
 def load_data():
-    engine = get_engine()
 
-    monthly = pd.read_sql(
-        "SELECT * FROM monthly_summary ORDER BY year, month",
-        engine
-    )
+    monthly = pd.read_csv("data/monthly_summary.csv")
+    annual = pd.read_csv("data/annual_sql_summary.csv")
+    hourly = pd.read_csv("data/hourly_summary.csv")
+    daily = pd.read_csv("data/daily_summary.csv")
+    pickup = pd.read_csv("data/top_pickup_zones.csv")
+    dropoff = pd.read_csv("data/top_dropoff_zones.csv")
+    economics = pd.read_csv("data/monthly_economics.csv")
 
-    annual = pd.read_sql(
-        "SELECT * FROM annual_sql_summary ORDER BY year",
-        engine
-    )
-
-    hourly = pd.read_sql(
-        "SELECT * FROM hourly_summary ORDER BY pickup_hour",
-        engine
-    )
-
-    daily = pd.read_sql(
-        "SELECT * FROM daily_summary ORDER BY day_of_week",
-        engine
-    )
-
-    pickup = pd.read_sql(
-        """
-        SELECT *
-        FROM top_pickup_zones
-        ORDER BY total_trips DESC
-        LIMIT 15
-        """,
-        engine
-    )
-
-    dropoff = pd.read_sql(
-        """
-        SELECT *
-        FROM top_dropoff_zones
-        ORDER BY total_trips DESC
-        LIMIT 15
-        """,
-        engine
-    )
-
-    economics = pd.read_sql(
-        "SELECT * FROM monthly_economics ORDER BY year, month",
-        engine
-    )
+    # Top 15 zonas por número de viajes
+    pickup = pickup.nlargest(15, "total_trips")
+    dropoff = dropoff.nlargest(15, "total_trips")
 
     return monthly, annual, hourly, daily, pickup, dropoff, economics
 
