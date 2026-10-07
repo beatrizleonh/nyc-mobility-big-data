@@ -1,106 +1,105 @@
 # NYC Mobility Intelligence 🚕
 
-## Big Data Architecture & Strategy Capstone
+## Proyecto Integrador: Arquitectura y Estrategia de Big Data
 
-NYC Mobility Intelligence is an end-to-end Big Data solution designed to transform large-scale New York City High Volume For-Hire Vehicle (FHVHV) trip data into actionable information for mobility and operational decision-making.
+**NYC Mobility Intelligence** es una solución integral de Big Data diseñada para transformar datos masivos de viajes de vehículos de transporte de alto volumen (FHVHV) de la ciudad de Nueva York en información útil para la toma de decisiones operativas y estratégicas.
 
-The project processes **15.86 GiB of raw Parquet data**, representing **684,376,551 trip records from January 2022 through December 2024**. The solution integrates Google Cloud Storage, Google Dataproc, PySpark, MariaDB, SQL, and Streamlit to demonstrate a scalable pipeline from raw ingestion to executive analytics.
-
----
-
-## 1. Business Problem
-
-High-volume mobility data can contain hundreds of millions of individual trip records, making conventional local databases, spreadsheets, and simple scripts inefficient for repeated large-scale analysis.
-
-The project addresses the challenge of transforming this volume of historical trip data into a manageable analytical product that allows decision-makers to understand:
-
-- How mobility demand changes over time.
-- Which hours and days concentrate the highest trip volumes.
-- How trip duration and average speed behave throughout the day.
-- Which pickup and dropoff zones concentrate activity.
-- How passenger base fares and driver payments evolve over time.
-
-The objective is not only to process the data, but to convert it into information that can support operational planning and mobility analysis.
+El proyecto procesa **15.86 GiB de datos originales en formato Parquet**, correspondientes a **684,376,551 viajes registrados entre enero de 2022 y diciembre de 2024**. La solución integra Google Cloud Storage, Google Dataproc, PySpark, MariaDB, SQL y Streamlit para construir un pipeline escalable desde la ingesta de datos hasta su visualización ejecutiva.
 
 ---
 
-## 2. Solution Overview
+## 1. Problema de negocio
 
-The solution follows a simple distributed architecture:
+Los sistemas de movilidad generan cientos de millones de registros individuales de viajes. Este volumen dificulta el análisis mediante herramientas convencionales como hojas de cálculo, bases de datos locales o scripts simples.
+
+El proyecto busca transformar este volumen de información histórica en un producto analítico que permita a los responsables de planeación y operación comprender:
+
+- Cómo cambia la demanda de movilidad a lo largo del tiempo.
+- Qué horas y días concentran el mayor volumen de viajes.
+- Cómo se comportan la duración y velocidad promedio de los viajes.
+- Qué zonas concentran mayor actividad de origen y destino.
+- Cómo evolucionan la tarifa base de los pasajeros y el pago a conductores.
+
+El objetivo no es únicamente procesar grandes volúmenes de datos, sino convertirlos en información accesible para apoyar decisiones operativas y estratégicas.
+
+---
+
+## 2. Visión general de la solución
+
+La solución sigue una arquitectura distribuida y simplificada:
 
 ```text
-NYC TLC FHVHV Data
-        ↓
-Google Cloud Storage
-      RAW Layer
-        ↓
-Google Dataproc
-     + PySpark
-        ↓
-Cleaning + Transformation
-        ↓
-Google Cloud Storage
-   CURATED Parquet
- (partitioned by year/month)
-        ↓
-Analytical Aggregations
-        ↓
- ┌─────────────────┬─────────────────┐
- │                 │                 │
-MariaDB         Analytical CSVs
-SQL Layer            │
-                     ↓
+Datos FHVHV de NYC TLC
+          ↓
+ Google Cloud Storage
+       Capa RAW
+          ↓
+ Google Dataproc + PySpark
+          ↓
+ Limpieza + Transformación
+          ↓
+ Google Cloud Storage
+   Capa CURATED en Parquet
+  particionada por año y mes
+          ↓
+ Agregaciones analíticas
+          ↓
+ ┌──────────────────┬──────────────────┐
+ │                  │                  │
+MariaDB        CSV analíticos
+Capa SQL              │
+                      ↓
                   Streamlit
-                     ↓
-          Executive Dashboard
+                      ↓
+             Dashboard ejecutivo
 ```
 
-The architecture follows the **KISS principle**: the full dataset is processed with distributed computing, while the final dashboard consumes compact analytical outputs rather than repeatedly scanning hundreds of millions of records.
+La arquitectura sigue el principio **KISS (Keep It Simple, Stupid)**: el conjunto masivo de datos se procesa mediante cómputo distribuido y el dashboard final consume resultados analíticos compactos, evitando procesar nuevamente cientos de millones de registros cada vez que un usuario consulta la aplicación.
 
 ---
 
-## 3. Data Source and Scale
+## 3. Fuente y escala de los datos
 
-**Source:** NYC Taxi & Limousine Commission (NYC TLC) – High Volume For-Hire Vehicle Trip Records.
+**Fuente:** NYC Taxi & Limousine Commission (NYC TLC), High Volume For-Hire Vehicle Trip Records.
 
-**Period:** January 2022 – December 2024.
+**Periodo:** enero de 2022 a diciembre de 2024.
 
-**Files:** 36 monthly Parquet files.
+**Archivos:** 36 archivos mensuales en formato Parquet.
 
-| Metric | Result |
+| Métrica | Resultado |
 |---|---:|
-| Raw storage volume | 15.86 GiB |
-| Original records | 684,376,551 |
-| Clean records | 683,913,899 |
-| Removed invalid records | 462,652 |
-| Removed share | 0.0676% |
-| Time coverage | 36 months |
+| Volumen RAW | 15.86 GiB |
+| Registros originales | 684,376,551 |
+| Registros limpios | 683,913,899 |
+| Registros inválidos eliminados | 462,652 |
+| Porcentaje eliminado | 0.0676% |
+| Cobertura temporal | 36 meses |
 
-Raw data is preserved separately from transformed data to maintain traceability and reproducibility.
+Los datos originales se conservan separados de los datos transformados para mantener trazabilidad y reproducibilidad.
 
 ---
 
-## 4. Data Pipeline
+## 4. Pipeline de datos
 
-### Ingestion
+### Ingesta
 
-Monthly Parquet files were ingested into a Google Cloud Storage RAW layer.
+Los 36 archivos mensuales en formato Parquet fueron almacenados en una capa **RAW** dentro de Google Cloud Storage.
 
-### Cleaning and Transformation
+### Limpieza y transformación
 
-PySpark on Google Dataproc was used to perform distributed validation and transformation.
+Se utilizó PySpark sobre Google Dataproc para realizar de manera distribuida los procesos de validación, limpieza y transformación.
 
-Quality controls included:
+Los controles de calidad incluyeron:
 
-- Invalid or non-positive trip distances.
-- Invalid or non-positive trip durations.
-- Negative passenger base fares.
-- Negative driver payments.
-- Invalid pickup/dropoff dates.
-- Null analysis for relevant fields.
-- Schema compatibility across monthly Parquet files.
+- Distancias de viaje inválidas o no positivas.
+- Duraciones inválidas o no positivas.
+- Tarifas base negativas.
+- Pagos negativos a conductores.
+- Fechas inválidas.
+- Análisis de valores nulos.
+- Compatibilidad de esquemas entre archivos Parquet mensuales.
 
-Additional analytical variables were derived, including:
+Además, se generaron variables analíticas como:
 
 - `year`
 - `month`
@@ -109,46 +108,46 @@ Additional analytical variables were derived, including:
 - `trip_minutes`
 - `avg_speed_mph`
 
-### Storage Optimization
+### Optimización del almacenamiento
 
-The cleaned dataset was stored as Parquet in the CURATED layer and partitioned by:
+El conjunto de datos limpio fue almacenado nuevamente en formato Parquet dentro de la capa **CURATED**, particionado por:
 
 ```text
 year/
 └── month/
 ```
 
-All **36 year-month partitions** were validated successfully.
+Se validaron correctamente las **36 particiones año-mes**.
 
-Partition pruning was also verified during Spark execution. A filtered query for December 2024 processed a partition containing **21,062,630 trips in approximately 0.69 seconds**.
-
----
-
-## 5. Analytical Layer
-
-Instead of sending the full curated dataset to the visualization layer, PySpark generates compact analytical datasets for executive consumption.
-
-The project includes:
-
-- Annual trip summary.
-- Monthly demand summary.
-- Hourly demand and operational indicators.
-- Day-of-week demand.
-- Top pickup zones.
-- Top dropoff zones.
-- Monthly passenger fare and driver pay indicators.
-
-These analytical outputs are persisted and used by downstream SQL and visualization components.
+También se comprobó el uso de **partition pruning** en Spark. Una consulta filtrada para diciembre de 2024 contabilizó **21,062,630 viajes en aproximadamente 0.69 segundos**, verificándose en el plan de ejecución la aplicación de filtros sobre las particiones.
 
 ---
 
-## 6. MariaDB / SQL Layer
+## 5. Capa analítica
 
-A MariaDB analytical layer was implemented to demonstrate relational consumption of the processed Big Data outputs.
+En lugar de enviar los cientos de millones de registros directamente a la herramienta de visualización, PySpark genera conjuntos de datos analíticos compactos.
 
-Seven analytical tables were created and validated:
+Se construyeron indicadores de:
 
-| Table | Rows |
+- Viajes anuales.
+- Demanda mensual.
+- Demanda y operación por hora.
+- Demanda por día de la semana.
+- Principales zonas de origen.
+- Principales zonas de destino.
+- Evolución mensual de tarifa base y pago a conductores.
+
+Estos resultados funcionan como capa de consumo para SQL y para el dashboard ejecutivo.
+
+---
+
+## 6. Capa SQL con MariaDB
+
+Se implementó MariaDB como capa relacional para demostrar el consumo estructurado de los resultados generados mediante Big Data.
+
+Se crearon y validaron siete tablas analíticas:
+
+| Tabla | Registros |
 |---|---:|
 | `annual_sql_summary` | 3 |
 | `daily_summary` | 7 |
@@ -158,68 +157,70 @@ Seven analytical tables were created and validated:
 | `top_dropoff_zones` | 264 |
 | `top_pickup_zones` | 263 |
 
-The repository includes reproducible SQL scripts for schema creation and data loading.
+El repositorio incluye scripts SQL reproducibles para la creación del esquema y la carga de los datos.
 
 ---
 
-## 7. Executive Dashboard
+## 7. Dashboard ejecutivo
 
-The processed analytical results are presented through an interactive Streamlit application.
+Los resultados analíticos se presentan mediante una aplicación interactiva desarrollada con Streamlit.
 
-The dashboard currently provides:
+El dashboard permite analizar:
 
-- Executive KPIs.
-- Annual and monthly demand evolution.
-- Demand by hour.
-- Demand by day of week.
-- Average operating speed by hour.
-- Top pickup and dropoff zones.
-- Passenger base fare and driver pay trends.
+- Indicadores ejecutivos principales.
+- Evolución anual y mensual de la demanda.
+- Demanda por hora.
+- Demanda por día de la semana.
+- Velocidad promedio por hora.
+- Principales zonas de origen y destino.
+- Evolución de tarifa base y pago a conductores.
 
-### Live Application
+### Aplicación desplegada
 
-https://nyc-mobility-big-data-cpfpwpukkxthk22kkzkpet.streamlit.app/
+La aplicación se encuentra desplegada públicamente mediante Streamlit Community Cloud.
 
-The final application is designed around two perspectives:
+La versión final contará con dos vistas principales:
 
-**Project Strategy**  
-Explains the business problem, architecture, CDO framework and expected strategic impact.
+### 📋 Estrategia del proyecto
 
-**Mobility Intelligence**  
-Represents the operational product that a decision-maker would use to explore mobility patterns and support planning decisions.
+Presentará el problema de negocio, las cuatro preguntas del CDO, la arquitectura desarrollada y el impacto/ROI de la solución.
 
----
+### 📊 Inteligencia de movilidad
 
-## 8. Key Findings
-
-Initial analysis identifies several relevant patterns:
-
-- Annual trip volume increased from approximately **212.1 million trips in 2022** to **239.4 million in 2024**.
-- The highest cumulative hourly demand occurs around **18:00**.
-- **Saturday** presents the highest cumulative trip volume by day of week.
-- Average operating speed declines substantially during high-demand daytime and afternoon periods.
-- Passenger base fare and driver pay indicators show an upward trend over the analyzed period.
-
-These findings provide the foundation for the project's strategic recommendations and executive decision-support layer.
+Representará el producto como sería utilizado en un escenario real por responsables de operación y planeación para consultar indicadores y apoyar la toma de decisiones.
 
 ---
 
-## 9. Technology Stack
+## 8. Hallazgos principales
 
-| Layer | Technology |
+El análisis realizado permite identificar inicialmente que:
+
+- El volumen anual aumentó de aproximadamente **212.1 millones de viajes en 2022 a 239.4 millones en 2024**.
+- La mayor concentración acumulada de demanda por hora se presenta alrededor de las **18:00 horas**.
+- El **sábado** registra el mayor volumen acumulado de viajes entre los días de la semana.
+- La velocidad promedio disminuye considerablemente durante periodos de alta demanda durante el día y la tarde.
+- Los indicadores de tarifa base de pasajeros y pago a conductores presentan una tendencia creciente durante el periodo analizado.
+
+Estos resultados serán utilizados para formular recomendaciones operativas y estratégicas.
+
+---
+
+## 9. Tecnologías utilizadas
+
+| Capa | Tecnología |
 |---|---|
-| Source | NYC TLC |
-| Cloud Storage | Google Cloud Storage |
-| Distributed Processing | Google Dataproc |
-| Big Data Engine | Apache Spark / PySpark |
-| Optimized Storage | Partitioned Parquet |
-| SQL Layer | MariaDB |
-| Visualization | Streamlit |
-| Version Control | GitHub |
+| Fuente | NYC TLC |
+| Almacenamiento en nube | Google Cloud Storage |
+| Infraestructura distribuida | Google Dataproc |
+| Procesamiento Big Data | Apache Spark / PySpark |
+| Almacenamiento optimizado | Parquet particionado |
+| Capa relacional | MariaDB / SQL |
+| Visualización | Streamlit |
+| Control de versiones | GitHub |
 
 ---
 
-## 10. Repository Structure
+## 10. Estructura del repositorio
 
 ```text
 nyc-mobility-big-data/
@@ -246,45 +247,44 @@ nyc-mobility-big-data/
     └── 02_load_data.sql
 ```
 
-Large RAW and CURATED datasets are intentionally not stored in GitHub.
+Los archivos masivos de las capas RAW y CURATED no se almacenan en GitHub debido a su tamaño.
 
 ---
 
-## 11. CDO Strategic Framework
+## 11. Las cuatro preguntas del CDO
 
-The project is structured around four strategic questions:
+### ¿Qué estamos construyendo?
 
-### What are we building?
+Un producto escalable de inteligencia de movilidad que transforma cientos de millones de registros de viajes de vehículos de transporte de alto volumen de Nueva York en indicadores operativos y ejecutivos.
 
-A scalable mobility intelligence product that transforms hundreds of millions of NYC for-hire vehicle trip records into operational and executive indicators.
+### ¿Para qué lo estamos haciendo?
 
-### Why are we building it?
+Para reducir la complejidad asociada al análisis de grandes volúmenes de información histórica de movilidad y proporcionar información accesible sobre demanda, comportamiento operativo, concentración geográfica y tendencias económicas.
 
-To reduce the complexity of analyzing large historical mobility datasets and provide decision-makers with accessible information about demand, operational behavior, geographic concentration and economic trends.
+### ¿Cómo lo estamos resolviendo?
 
-### How are we solving it?
+Mediante una arquitectura distribuida que utiliza Google Cloud Storage para almacenamiento, Dataproc y PySpark para ETL a gran escala, Parquet particionado para persistencia optimizada, MariaDB como capa relacional y Streamlit para visualización ejecutiva.
 
-Through a distributed Big Data architecture using GCS for storage, Dataproc and PySpark for large-scale ETL, partitioned Parquet for optimized persistence, MariaDB for relational analytical consumption, and Streamlit for executive visualization.
+### ¿A quién beneficia y cuál es el ROI?
 
-### Who benefits and what is the ROI?
+Los usuarios objetivo son responsables de operación y planeación de movilidad que necesitan acceder rápidamente a patrones históricos de demanda y desempeño operativo.
 
-The primary users are mobility operations and planning decision-makers who need rapid access to historical demand and operating patterns.
-
-The ROI component will be evaluated through explicit operational scenarios and measurable assumptions rather than unsupported claims of realized financial savings.
+El ROI se cuantificará mediante escenarios operativos y supuestos explícitos y medibles, evitando atribuir a la solución ahorros financieros que no puedan demostrarse con los datos disponibles.
 
 ---
 
-## 12. Current Project Status
+## 12. Estado del proyecto
 
-- [x] 15+ GB data ingestion
-- [x] Distributed PySpark processing
-- [x] Data cleaning and transformation
-- [x] Partitioned Parquet storage
-- [x] Data quality validation
-- [x] Analytical aggregations
-- [x] MariaDB / SQL implementation
-- [x] Streamlit dashboard deployment
-- [ ] Final strategic ROI model
-- [ ] Final architecture diagram
-- [ ] Technical-executive report
-- [ ] Executive pitch
+- [x] Ingesta de más de 15 GB
+- [x] Procesamiento distribuido con PySpark
+- [x] Limpieza y transformación
+- [x] Almacenamiento Parquet particionado
+- [x] Validación de calidad e integridad
+- [x] Agregaciones analíticas
+- [x] Implementación de MariaDB / SQL
+- [x] Despliegue inicial del dashboard en Streamlit
+- [ ] Modelo estratégico de ROI
+- [ ] Diagrama final de arquitectura
+- [ ] Vista estratégica y vista operativa final en Streamlit
+- [ ] Documento técnico-ejecutivo
+- [ ] Executive Pitch
