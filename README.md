@@ -202,6 +202,7 @@ https://nyc-mobility-big-data-cpfpwpukkxthk22kkzkpet.streamlit.app/
 ---
 
 ***Estructura del repositorio***
+```text
 nyc-mobility-big-data/
 │
 ├── data/
