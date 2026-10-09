@@ -1,106 +1,120 @@
-# NYC Mobility Intelligence 🚕
+# NYC Mobility Intelligence
 
-## Proyecto Integrador: Arquitectura y Estrategia de Big Data
+Proyecto Final de la materia Grandes Datos.  
+Maestría en Ciencia de Datos · Universidad Panamericana
 
-**NYC Mobility Intelligence** es una solución integral de Big Data diseñada para transformar datos masivos de viajes de vehículos de transporte de alto volumen (FHVHV) de la ciudad de Nueva York en información útil para la toma de decisiones operativas y estratégicas.
+**Alumnos:** Beatriz León Hernández y Juan Pablo Portillo Muralles  
+Octubre 2026
 
-El proyecto procesa **15.86 GiB de datos originales en formato Parquet**, correspondientes a **684,376,551 viajes registrados entre enero de 2022 y diciembre de 2024**. La solución integra Google Cloud Storage, Google Dataproc, PySpark, MariaDB, SQL y Streamlit para construir un pipeline escalable desde la ingesta de datos hasta su visualización ejecutiva.
+NYC Mobility Intelligence es una arquitectura de Big Data diseñada para analizar
+los viajes de vehículos de transporte de alto volumen (FHVHV) publicados por la
+New York City Taxi & Limousine Commission (NYC TLC).
 
----
+El proyecto procesa información de enero de 2022 a diciembre de 2024 para
+responder una pregunta de negocio:
 
-## 1. Problema de negocio
+> ¿En qué zonas y horarios se concentra la demanda de viajes y dónde existen
+> oportunidades para mejorar la asignación de vehículos?
 
-Los sistemas de movilidad generan cientos de millones de registros individuales de viajes. Este volumen dificulta el análisis mediante herramientas convencionales como hojas de cálculo, bases de datos locales o scripts simples.
-
-El proyecto busca transformar este volumen de información histórica en un producto analítico que permita a los responsables de planeación y operación comprender:
-
-- Cómo cambia la demanda de movilidad a lo largo del tiempo.
-- Qué horas y días concentran el mayor volumen de viajes.
-- Cómo se comportan la duración y velocidad promedio de los viajes.
-- Qué zonas concentran mayor actividad de origen y destino.
-- Cómo evolucionan la tarifa base de los pasajeros y el pago a conductores.
-
-El objetivo no es únicamente procesar grandes volúmenes de datos, sino convertirlos en información accesible para apoyar decisiones operativas y estratégicas.
+Se procesaron **684,376,551 registros originales**, distribuidos en 36 archivos
+Parquet con un tamaño total de **15.86 GiB (17.03 GB)**.
+Después de la limpieza se conservaron **683,913,899 viajes válidos**.
 
 ---
 
-## 2. Visión general de la solución
+***Arquitectura***
+El proyecto implementa un pipeline de extremo a extremo:
 
-La solución sigue una arquitectura distribuida y simplificada:
+NYC TLC  
+↓  
+Google Cloud Storage - Raw  
+↓  
+Dataproc + PySpark  
+↓  
+Google Cloud Storage - Curated  
+↓  
+Capa analítica  
+↓  
+MariaDB + CSV  
+↓  
+GitHub + Streamlit
 
-```text
-Datos FHVHV de NYC TLC
-          ↓
- Google Cloud Storage
-       Capa RAW
-          ↓
- Google Dataproc + PySpark
-          ↓
- Limpieza + Transformación
-          ↓
- Google Cloud Storage
-   Capa CURATED en Parquet
-  particionada por año y mes
-          ↓
- Agregaciones analíticas
-          ↓
- ┌──────────────────┬──────────────────┐
- │                  │                  │
-MariaDB        CSV analíticos
-Capa SQL              │
-                      ↓
-                  Streamlit
-                      ↓
-             Dashboard ejecutivo
-```
+***Google Cloud Storage***
+Bucket:
+`nyc-mobility-bl-jp-2026`
 
-La arquitectura sigue el principio **KISS (Keep It Simple, Stupid)**: el conjunto masivo de datos se procesa mediante cómputo distribuido y el dashboard final consume resultados analíticos compactos, evitando procesar nuevamente cientos de millones de registros cada vez que un usuario consulta la aplicación.
+Principales capas:
+- `raw/high-volume-for-hire-vehicle/`: 36 archivos Parquet originales.
+- `reference/`: archivos de referencia de zonas de la NYC TLC.
+- `curated/fhvhv_trips/`: datos limpios y transformados.
+- `analytics/`: conjuntos analíticos en Parquet.
+- `analytics_csv/`: resultados analíticos exportados a CSV.
 
----
+Los archivos de `raw` se conservaron sin modificaciones para mantener una copia
+de la fuente original y permitir reproducir el procesamiento.
 
-## 3. Fuente y escala de los datos
+***Dataproc y PySpark***
+El procesamiento distribuido se realizó en el clúster:
 
-**Fuente:** NYC Taxi & Limousine Commission (NYC TLC), High Volume For-Hire Vehicle Trip Records.
+`nyc-clsuter-final`
 
-**Periodo:** enero de 2022 a diciembre de 2024.
+Configuración utilizada:
 
-**Archivos:** 36 archivos mensuales en formato Parquet.
+- 1 nodo maestro.
+- 2 nodos trabajadores.
+- Máquinas `n1-standard-4`.
+- Dataproc 2.3 sobre Debian 12.
+- PySpark.
+- Jupyter.
+- Apagado automático después de una hora sin actividad.
 
-| Métrica | Resultado |
-|---|---:|
-| Volumen RAW | 15.86 GiB |
-| Registros originales | 684,376,551 |
-| Registros limpios | 683,913,899 |
-| Registros inválidos eliminados | 462,652 |
-| Porcentaje eliminado | 0.0676% |
-| Cobertura temporal | 36 meses |
+Las transformaciones principales se realizaron mediante DataFrames de PySpark y
+también se utilizó Spark SQL para generar y validar el resumen anual.
 
-Los datos originales se conservan separados de los datos transformados para mantener trazabilidad y reproducibilidad.
+***Curated***
+Después de la limpieza se obtuvieron: 683,913,899 viajes válidos
 
----
+Los datos fueron almacenados nuevamente como Parquet y particionados por:
+`year / month`
+Esto permite que Spark consulte únicamente las particiones necesarias en lugar
+de recorrer los tres años completos.
 
-## 4. Pipeline de datos
+## Pipeline de datos
 
-### Ingesta
+***1. Ingesta***
 
-Los 36 archivos mensuales en formato Parquet fueron almacenados en una capa **RAW** dentro de Google Cloud Storage.
+Se utilizaron 36 archivos mensuales de NYC TLC correspondientes al periodo:
+enero 2022 - diciembre 2024
 
-### Limpieza y transformación
+Los archivos fueron transferidos desde la fuente oficial hacia Cloud Storage.
 
-Se utilizó PySpark sobre Google Dataproc para realizar de manera distribuida los procesos de validación, limpieza y transformación.
+***2. Homologación del esquema***
 
-Los controles de calidad incluyeron:
+Se detectaron diferencias en los tipos de datos de `PULocationID` y
+`DOLocationID` entre distintos meses.
 
-- Distancias de viaje inválidas o no positivas.
-- Duraciones inválidas o no positivas.
-- Tarifas base negativas.
-- Pagos negativos a conductores.
-- Fechas inválidas.
-- Análisis de valores nulos.
-- Compatibilidad de esquemas entre archivos Parquet mensuales.
+Los archivos fueron leídos individualmente, las columnas se homologaron a
+`long` y posteriormente se integraron mediante `unionByName`.
 
-Además, se generaron variables analíticas como:
+***3. Limpieza***
+Se eliminaron registros con:
 
+- `trip_miles <= 0`
+- `trip_time <= 0`
+- tarifa base negativa
+- pago negativo al conductor
+- llegada igual o anterior a la recogida
+
+En total se eliminaron: 462,652 registros (0.068%)
+
+Los valores nulos de campos opcionales se conservaron cuando no afectaban los
+indicadores utilizados.
+
+No se realizó desduplicación debido a que el dataset no contiene un
+identificador único de viaje.
+
+***4. Transformación***
+Se generaron variables adicionales:
 - `year`
 - `month`
 - `day_of_week`
@@ -108,127 +122,87 @@ Además, se generaron variables analíticas como:
 - `trip_minutes`
 - `avg_speed_mph`
 
-### Optimización del almacenamiento
+***5. Capa analítica***
+Se generaron siete conjuntos analíticos:
 
-El conjunto de datos limpio fue almacenado nuevamente en formato Parquet dentro de la capa **CURATED**, particionado por:
-
-```text
-year/
-└── month/
-```
-
-Se validaron correctamente las **36 particiones año-mes**.
-
-También se comprobó el uso de **partition pruning** en Spark. Una consulta filtrada para diciembre de 2024 contabilizó **21,062,630 viajes en aproximadamente 0.69 segundos**, verificándose en el plan de ejecución la aplicación de filtros sobre las particiones.
-
----
-
-## 5. Capa analítica
-
-En lugar de enviar los cientos de millones de registros directamente a la herramienta de visualización, PySpark genera conjuntos de datos analíticos compactos.
-
-Se construyeron indicadores de:
-
-- Viajes anuales.
-- Demanda mensual.
-- Demanda y operación por hora.
-- Demanda por día de la semana.
-- Principales zonas de origen.
-- Principales zonas de destino.
-- Evolución mensual de tarifa base y pago a conductores.
-
-Estos resultados funcionan como capa de consumo para SQL y para el dashboard ejecutivo.
-
----
-
-## 6. Capa SQL con MariaDB
-
-Se implementó MariaDB como capa relacional para demostrar el consumo estructurado de los resultados generados mediante Big Data.
-
-Se crearon y validaron siete tablas analíticas:
-
-| Tabla | Registros |
-|---|---:|
-| `annual_sql_summary` | 3 |
-| `daily_summary` | 7 |
-| `hourly_summary` | 24 |
-| `monthly_economics` | 36 |
-| `monthly_summary` | 36 |
-| `top_dropoff_zones` | 264 |
-| `top_pickup_zones` | 263 |
-
-El repositorio incluye scripts SQL reproducibles para la creación del esquema y la carga de los datos.
-
----
-
-## 7. Dashboard ejecutivo
-
-Los resultados analíticos se presentan mediante una aplicación interactiva desarrollada con Streamlit.
-
-El dashboard permite analizar:
-
-- Indicadores ejecutivos principales.
-- Evolución anual y mensual de la demanda.
-- Demanda por hora.
-- Demanda por día de la semana.
-- Velocidad promedio por hora.
-- Principales zonas de origen y destino.
-- Evolución de tarifa base y pago a conductores.
-
-### Aplicación desplegada
-
-La aplicación se encuentra desplegada públicamente mediante Streamlit Community Cloud.
-
-La versión final contará con dos vistas principales:
-
-### 📋 Estrategia del proyecto
-
-Presentará el problema de negocio, las cuatro preguntas del CDO, la arquitectura desarrollada y el impacto/ROI de la solución.
-
-### 📊 Inteligencia de movilidad
-
-Representará el producto como sería utilizado en un escenario real por responsables de operación y planeación para consultar indicadores y apoyar la toma de decisiones.
-
----
-
-## 8. Hallazgos principales
-
-El análisis realizado permite identificar inicialmente que:
-
-- El volumen anual aumentó de aproximadamente **212.1 millones de viajes en 2022 a 239.4 millones en 2024**.
-- La mayor concentración acumulada de demanda por hora se presenta alrededor de las **18:00 horas**.
-- El **sábado** registra el mayor volumen acumulado de viajes entre los días de la semana.
-- La velocidad promedio disminuye considerablemente durante periodos de alta demanda durante el día y la tarde.
-- Los indicadores de tarifa base de pasajeros y pago a conductores presentan una tendencia creciente durante el periodo analizado.
-
-Estos resultados serán utilizados para formular recomendaciones operativas y estratégicas.
-
----
-
-## 9. Tecnologías utilizadas
-
-| Capa | Tecnología |
+| Dataset | Descripción |
 |---|---|
-| Fuente | NYC TLC |
-| Almacenamiento en nube | Google Cloud Storage |
-| Infraestructura distribuida | Google Dataproc |
-| Procesamiento Big Data | Apache Spark / PySpark |
-| Almacenamiento optimizado | Parquet particionado |
-| Capa relacional | MariaDB / SQL |
-| Visualización | Streamlit |
-| Control de versiones | GitHub |
+| `annual_sql_summary` | Indicadores anuales generados con Spark SQL |
+| `monthly_summary` | Demanda y métricas por mes |
+| `daily_summary` | Demanda por día de la semana |
+| `hourly_summary` | Demanda, duración y velocidad por hora |
+| `monthly_economics` | Indicadores económicos mensuales |
+| `top_pickup_zones` | Indicadores por zona de origen |
+| `top_dropoff_zones` | Indicadores por zona de destino |
+
+Los resultados se almacenaron en Parquet para continuar trabajando dentro de
+GCP y en CSV para la capa SQL y el dashboard.
+
+***Capa SQL***
+Se implementó una capa relacional utilizando **MariaDB 11.4** dentro de un
+contenedor local de Docker.
+
+Base de datos: `nyc_mobility`
+La base contiene siete tablas correspondientes a los conjuntos analíticos.
+Los scripts para reproducir esta capa se encuentran en:
+-sql/01_schema_mariadb.sql
+-sql/02_load_data.sql
+
+***Rendimiento***
+La capa `curated` fue particionada por año y mes.
+Como prueba de rendimiento se consultó diciembre de 2024:
+- Registros: **21,062,630**
+- Tiempo de conteo: **0.69 segundos**
+
+El plan de ejecución de Spark confirmó la aplicación de `PartitionFilters`
+sobre `year = 2024` y `month = 12`.
+
+Esto permite evitar la lectura de los otros 35 meses cuando una consulta requiere
+únicamente un periodo específico.
+
+***Principales resultados***
+Entre los hallazgos obtenidos:
+
+- Los viajes aumentaron de **212.1 millones en 2022** a **239.4 millones en 2024**.
+- El crecimiento anual pasó de **9.5% en 2023** a **3.0% en 2024**.
+- El **28% de los viajes** ocurre entre las 16:00 y las 20:59.
+- El pico de demanda ocurre aproximadamente a las **18:00**.
+- La velocidad promedio disminuye considerablemente durante las horas de mayor demanda.
+- El sábado registra aproximadamente **37% más viajes que el lunes**.
+- LaGuardia y JFK se encuentran entre las principales zonas de origen.
+- La tarifa base promedio aumentó **41.8%** entre enero de 2022 y diciembre de 2024.
+
+
+***Dashboard***
+Los resultados se publicaron mediante una aplicación desarrollada con Streamlit.
+
+El dashboard incluye dos vistas:
+1. Estrategia del proyecto
+- problema de negocio
+- preguntas del CDO
+- arquitectura
+- escala del proyecto
+- simulador de impacto económico potencial
+
+2. Inteligencia de movilidad
+- demanda anual y mensual
+- demanda por día
+- demanda y velocidad por hora
+- zonas de origen y destino
+- indicadores económicos
+- hallazgos y recomendaciones
+
+El dashboard consume los siete CSV analíticos almacenados en este repositorio,
+por lo que no necesita procesar nuevamente los 684 millones de registros ni
+mantener activo el clúster de Dataproc.
+
+**Dashboard:**  
+https://nyc-mobility-big-data-cpfpwpukkxthk22kkzkpet.streamlit.app/
 
 ---
 
-## 10. Estructura del repositorio
-
-```text
+***Estructura del repositorio***
 nyc-mobility-big-data/
-│
-├── app.py
-├── requirements.txt
-├── README.md
-├── .gitignore
 │
 ├── data/
 │   ├── annual_sql_summary.csv
@@ -242,49 +216,10 @@ nyc-mobility-big-data/
 ├── ipynb/
 │   └── NYC_Mobility_Big_Data.ipynb
 │
-└── sql/
-    ├── 01_schema_mariadb.sql
-    └── 02_load_data.sql
-```
-
-Los archivos masivos de las capas RAW y CURATED no se almacenan en GitHub debido a su tamaño.
-
----
-
-## 11. Las cuatro preguntas del CDO
-
-### ¿Qué estamos construyendo?
-
-Un producto escalable de inteligencia de movilidad que transforma cientos de millones de registros de viajes de vehículos de transporte de alto volumen de Nueva York en indicadores operativos y ejecutivos.
-
-### ¿Para qué lo estamos haciendo?
-
-Para reducir la complejidad asociada al análisis de grandes volúmenes de información histórica de movilidad y proporcionar información accesible sobre demanda, comportamiento operativo, concentración geográfica y tendencias económicas.
-
-### ¿Cómo lo estamos resolviendo?
-
-Mediante una arquitectura distribuida que utiliza Google Cloud Storage para almacenamiento, Dataproc y PySpark para ETL a gran escala, Parquet particionado para persistencia optimizada, MariaDB como capa relacional y Streamlit para visualización ejecutiva.
-
-### ¿A quién beneficia y cuál es el ROI?
-
-Los usuarios objetivo son responsables de operación y planeación de movilidad que necesitan acceder rápidamente a patrones históricos de demanda y desempeño operativo.
-
-El ROI se cuantificará mediante escenarios operativos y supuestos explícitos y medibles, evitando atribuir a la solución ahorros financieros que no puedan demostrarse con los datos disponibles.
-
----
-
-## 12. Estado del proyecto
-
-- [x] Ingesta de más de 15 GB
-- [x] Procesamiento distribuido con PySpark
-- [x] Limpieza y transformación
-- [x] Almacenamiento Parquet particionado
-- [x] Validación de calidad e integridad
-- [x] Agregaciones analíticas
-- [x] Implementación de MariaDB / SQL
-- [x] Despliegue inicial del dashboard en Streamlit
-- [ ] Modelo estratégico de ROI
-- [ ] Diagrama final de arquitectura
-- [ ] Vista estratégica y vista operativa final en Streamlit
-- [ ] Documento técnico-ejecutivo
-- [ ] Executive Pitch
+├── sql/
+│   ├── 01_schema_mariadb.sql
+│   └── 02_load_data.sql
+│
+├── app.py
+├── requirements.txt
+└── README.md
