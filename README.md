@@ -20,9 +20,7 @@ Se procesaron **684,376,551 registros originales**, distribuidos en 36 archivos
 Parquet con un tamaño total de **15.86 GiB (17.03 GB)**.
 Después de la limpieza se conservaron **683,913,899 viajes válidos**.
 
----
-
-***Arquitectura***
+## Arquitectura
 El proyecto implementa un pipeline de extremo a extremo:
 
 NYC TLC  
